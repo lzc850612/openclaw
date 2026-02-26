@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { discoverPeer } from "../../a2a/discovery.js";
 import { enqueueAndSend } from "../../a2a/message-queue.js";
 import { buildA2ASessionKey } from "../../a2a/session-keys.js";
-import { createTask } from "../../a2a/task-store.js";
+import { appendMessage, createTask } from "../../a2a/task-store.js";
 import { loadConfig } from "../../config/config.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { resolveDefaultAgentId, resolveSessionAgentId } from "../agent-scope.js";
@@ -106,6 +106,16 @@ Parameters:
         type: "task.request",
         content: message,
       };
+
+      // Record the outbound message in the task store so the monitor can show it.
+      appendMessage(localAgentId, taskId, {
+        messageId,
+        fromInstanceUrl: localInstanceUrl,
+        fromAgentId: localAgentId,
+        type: "task.request",
+        content: message,
+        receivedAtMs: Date.now(),
+      });
 
       const sendResult = await enqueueAndSend({
         agentId: localAgentId,
