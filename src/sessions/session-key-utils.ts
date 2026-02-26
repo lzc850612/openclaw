@@ -90,6 +90,14 @@ export function getSubagentDepth(sessionKey: string | undefined | null): number 
   return raw.split(":subagent:").length - 1;
 }
 
+export function isA2ASessionKey(sessionKey: string | undefined | null): boolean {
+  const parsed = parseAgentSessionKey(sessionKey);
+  if (!parsed) {
+    return false;
+  }
+  return parsed.rest.toLowerCase().startsWith("a2a:");
+}
+
 export function isAcpSessionKey(sessionKey: string | undefined | null): boolean {
   const raw = (sessionKey ?? "").trim();
   if (!raw) {

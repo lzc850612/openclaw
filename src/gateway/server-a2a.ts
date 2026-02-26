@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { handleA2aMessageRequest } from "../a2a/gateway-handler.js";
 import { handleWellKnownRequest } from "../a2a/gateway-wellknown.js";
+import type { CliDeps } from "../cli/deps.js";
 import { loadConfig } from "../config/config.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
@@ -13,13 +14,13 @@ const log = createSubsystemLogger("a2a");
  * Owns the /.well-known/openclaw.json and /a2a/* URL namespaces.
  * Returns false for any path it does not own so the caller continues its chain.
  */
-export function createA2aRequestHandler(): A2ARequestHandler {
+export function createA2aRequestHandler(deps?: CliDeps): A2ARequestHandler {
   return async (req, res) => {
     const cfg = loadConfig();
     if (await handleWellKnownRequest(req, res, cfg)) {
       return true;
     }
-    if (await handleA2aMessageRequest(req, res, cfg, log)) {
+    if (await handleA2aMessageRequest(req, res, cfg, log, deps)) {
       return true;
     }
     return false;

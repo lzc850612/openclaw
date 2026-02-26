@@ -117,7 +117,7 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
-  const handleA2aRequest = createA2aRequestHandler();
+  const handleA2aRequest = createA2aRequestHandler(params.deps);
 
   const bindHosts = await resolveGatewayListenHosts(params.bindHost);
   const httpServers: HttpServer[] = [];
