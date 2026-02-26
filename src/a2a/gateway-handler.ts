@@ -6,7 +6,7 @@ import { runCronIsolatedAgentTurn } from "../cron/isolated-agent.js";
 import type { CronJob } from "../cron/types.js";
 import { readJsonBodyWithLimit } from "../infra/http-body.js";
 import { buildA2ASessionKey } from "./session-keys.js";
-import { appendMessage } from "./task-store.js";
+import { appendMessage, createTask, loadTask } from "./task-store.js";
 
 export const A2A_MESSAGE_PATH = "/a2a/message";
 const MAX_BODY_BYTES = 1_000_000; // 1 MB
@@ -145,6 +145,28 @@ async function dispatchInboundTurn(
   const { resolveDefaultAgentId } = await import("../agents/agent-scope.js");
   const agentId = resolveDefaultAgentId(cfg);
 
+  // Auto-create task as responder when first inbound message arrives.
+  if (!loadTask(agentId, msg.taskId)) {
+    try {
+      createTask({
+        taskId: msg.taskId,
+        agentId,
+        role: "responder",
+        remoteInstanceUrl: msg.fromInstanceUrl,
+        remoteAgentId: msg.fromAgentId,
+        // Use the first message content as a stand-in goal until the protocol
+        // evolves to carry an explicit goal field.
+        goal: msg.content,
+        status: "active",
+      });
+    } catch (err) {
+      log.debug("a2a: could not auto-create responder task", {
+        taskId: msg.taskId,
+        error: String(err),
+      });
+    }
+  }
+
   // Persist message to task store.
   const storedMsg = {
     messageId: msg.messageId,
@@ -158,7 +180,6 @@ async function dispatchInboundTurn(
   try {
     appendMessage(agentId, msg.taskId, storedMsg);
   } catch (err) {
-    // Task may not exist yet (initiator side) — still dispatch the agent turn.
     log.debug("a2a: could not append message to task store", {
       taskId: msg.taskId,
       error: String(err),
