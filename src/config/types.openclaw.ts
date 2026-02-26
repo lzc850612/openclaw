@@ -8,6 +8,7 @@ import type { CronConfig } from "./types.cron.js";
 import type {
   CanvasHostConfig,
   DiscoveryConfig,
+  FederationConfig,
   GatewayConfig,
   TalkConfig,
 } from "./types.gateway.js";
@@ -107,6 +108,7 @@ export type OpenClawConfig = {
   canvasHost?: CanvasHostConfig;
   talk?: TalkConfig;
   gateway?: GatewayConfig;
+  federation?: FederationConfig;
   memory?: MemoryConfig;
 };
 

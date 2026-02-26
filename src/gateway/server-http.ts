@@ -422,6 +422,8 @@ export function createGatewayHttpServer(opts: {
   strictTransportSecurityHeader?: string;
   handleHooksRequest: HooksRequestHandler;
   handlePluginRequest?: HooksRequestHandler;
+  /** A2A federation handler — public routes (no gateway auth required). */
+  handleA2aRequest?: HooksRequestHandler;
   resolvedAuth: ResolvedGatewayAuth;
   /** Optional rate limiter for auth brute-force protection. */
   rateLimiter?: AuthRateLimiter;
@@ -439,6 +441,7 @@ export function createGatewayHttpServer(opts: {
     strictTransportSecurityHeader,
     handleHooksRequest,
     handlePluginRequest,
+    handleA2aRequest,
     resolvedAuth,
     rateLimiter,
   } = opts;
@@ -473,6 +476,10 @@ export function createGatewayHttpServer(opts: {
         req.url = scopedCanvas.rewrittenUrl;
       }
       const requestPath = new URL(req.url ?? "/", "http://localhost").pathname;
+      // A2A federation routes are public (no gateway auth). Dispatch first.
+      if (handleA2aRequest && (await handleA2aRequest(req, res))) {
+        return;
+      }
       if (await handleHooksRequest(req, res)) {
         return;
       }

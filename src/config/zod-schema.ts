@@ -463,6 +463,13 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    federation: z
+      .object({
+        enabled: z.boolean().optional(),
+        publicUrl: HttpUrlSchema.optional(),
+      })
+      .strict()
+      .optional(),
     gateway: z
       .object({
         port: z.number().int().positive().optional(),

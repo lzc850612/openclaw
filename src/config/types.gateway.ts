@@ -315,6 +315,13 @@ export type GatewayToolsConfig = {
   allow?: string[];
 };
 
+export type FederationConfig = {
+  /** Enable A2A federation routes. When false, all /a2a/* routes return 404. Default: false. */
+  enabled?: boolean;
+  /** The publicly reachable base URL of this gateway (e.g. "http://localhost:18789"). */
+  publicUrl?: string;
+};
+
 export type GatewayConfig = {
   /** Single multiplexed port for Gateway WS + HTTP (default: 18789). */
   port?: number;

@@ -12,6 +12,7 @@ import type { ChatAbortControllerEntry } from "./chat-abort.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import type { HooksConfigResolved } from "./hooks.js";
 import { resolveGatewayListenHosts } from "./net.js";
+import { createA2aRequestHandler } from "./server-a2a.js";
 import {
   createGatewayBroadcaster,
   type GatewayBroadcastFn,
@@ -116,6 +117,8 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
+  const handleA2aRequest = createA2aRequestHandler();
+
   const bindHosts = await resolveGatewayListenHosts(params.bindHost);
   const httpServers: HttpServer[] = [];
   const httpBindHosts: string[] = [];
@@ -132,6 +135,7 @@ export async function createGatewayRuntimeState(params: {
       strictTransportSecurityHeader: params.strictTransportSecurityHeader,
       handleHooksRequest,
       handlePluginRequest,
+      handleA2aRequest,
       resolvedAuth: params.resolvedAuth,
       rateLimiter: params.rateLimiter,
       tlsOptions: params.gatewayTls?.enabled ? params.gatewayTls.tlsOptions : undefined,
