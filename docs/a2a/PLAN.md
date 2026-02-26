@@ -49,22 +49,22 @@ Goal: an inbound `POST /a2a/message` endpoint accepts messages and delivers them
 agent reasoning loop. No signature verification — any caller that can reach the gateway can
 deliver. This is intentionally open for dev/test; auth is added in Phase 10.
 
-- ☐ **2.1** Implement `POST /a2a/message` endpoint (no auth)
+- ✅ **2.1** Implement `POST /a2a/message` endpoint (no auth)
   - File: `src/a2a/gateway-handler.ts`
   - Validate required fields: `taskId`, `messageId`, `fromInstanceUrl`, `fromAgentId`, `type`,
     `content`
   - Return 400 on missing/malformed fields; 202 on success
   - Log all inbound messages at debug level (taskId, fromAgent, type)
 
-- ☐ **2.2** Register plugin HTTP routes in gateway
+- ✅ **2.2** Register plugin HTTP routes in gateway
   - `src/gateway/server-a2a.ts`: add `POST /a2a/message` and `GET /.well-known/openclaw.json`
   - Routes active only when `federation.enabled = true`
 
-- ☐ **2.3** Implement outbound HTTP POST (no signing)
+- ✅ **2.3** Implement outbound HTTP POST (no signing)
   - File: `src/a2a/message-queue.ts` (stub — full retry in Phase 3)
   - Simple fetch POST to `<peerInstanceUrl>/a2a/message`; log success/failure
 
-- ☐ **2.4** Write tests for Phase 2
+- ✅ **2.4** Write tests for Phase 2
   - Unit: request validation (missing fields, malformed types)
   - Integration: POST returns 202; missing fields return 400; routes absent when federation disabled
 
