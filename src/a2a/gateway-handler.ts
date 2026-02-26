@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { CliDeps } from "../cli/deps.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { runCronIsolatedAgentTurn } from "../cron/isolated-agent.js";
-import type { CronJob } from "../cron/types.js";
 import { readJsonBodyWithLimit } from "../infra/http-body.js";
+import { runA2AAgentTurn } from "./agent-turn.js";
 import { enqueueAndSend } from "./message-queue.js";
 import { buildA2ASessionKey } from "./session-keys.js";
 import { appendMessage, createTask, loadTask, transitionTask } from "./task-store.js";
@@ -143,7 +142,7 @@ async function dispatchInboundTurn(
   msg: InboundA2AMessage,
   cfg: OpenClawConfig,
   log: HandlerLog,
-  deps: CliDeps,
+  _deps: CliDeps,
 ): Promise<void> {
   const { resolveDefaultAgentId } = await import("../agents/agent-scope.js");
   const agentId = resolveDefaultAgentId(cfg);
@@ -217,7 +216,7 @@ async function dispatchInboundTurn(
     }
 
     // Dispatch agent turn so the agent can do its final processing.
-    await runAgentTurn(agentId, msg, cfg, log, deps);
+    await runAgentTurn(agentId, msg, cfg, log);
 
     // After the turn: send completed and close the task.
     void sendCompletedReply(agentId, msg, localInstanceUrl, cfg, log);
@@ -234,7 +233,7 @@ async function dispatchInboundTurn(
   }
 
   // Regular message — dispatch agent turn.
-  await runAgentTurn(agentId, msg, cfg, log, deps);
+  await runAgentTurn(agentId, msg, cfg, log);
 }
 
 /** Send { type: "completed" } back to the peer that sent "completing". */
@@ -280,43 +279,20 @@ async function runAgentTurn(
   msg: InboundA2AMessage,
   cfg: OpenClawConfig,
   log: HandlerLog,
-  deps: CliDeps,
 ): Promise<void> {
   const sessionKey = buildA2ASessionKey(agentId, msg.taskId);
-  const jobId = randomUUID();
-  const now = Date.now();
-  const job: CronJob = {
-    id: jobId,
-    agentId,
-    name: `a2a:${msg.taskId}`,
-    enabled: true,
-    createdAtMs: now,
-    updatedAtMs: now,
-    schedule: { kind: "at", at: new Date(now).toISOString() },
-    sessionTarget: "isolated",
-    wakeMode: "now",
-    payload: {
-      kind: "agentTurn",
-      message: msg.content,
-      allowUnsafeExternalContent: false,
-    },
-    state: { nextRunAtMs: now },
-  };
+  const task = loadTask(agentId, msg.taskId);
+  if (!task) {
+    log.debug("a2a: skipping agent turn — task not found", { taskId: msg.taskId });
+    return;
+  }
 
-  try {
-    await runCronIsolatedAgentTurn({
-      cfg,
-      deps,
-      job,
-      message: msg.content,
-      sessionKey,
-      lane: "cron",
-    });
-  } catch (err) {
+  const result = await runA2AAgentTurn({ cfg, agentId, task, message: msg.content, sessionKey });
+  if (result.status === "error") {
     log.debug("a2a: agent turn failed", {
       taskId: msg.taskId,
       sessionKey,
-      error: String(err),
+      error: result.error,
     });
   }
 }

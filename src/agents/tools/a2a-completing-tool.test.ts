@@ -95,7 +95,7 @@ describe("a2a_send_completing tool", () => {
     setup();
     const tool = createA2ACompletingTool({ agentSessionKey: "agent:main:a2a:task-1" });
     const result = await tool.execute("call-1", { result: "All done" });
-    const parsed = JSON.parse(result.content[0].text) as {
+    const parsed = JSON.parse((result.content[0] as { text: string }).text) as {
       taskId: string;
       status: string;
       messageSent: boolean;
@@ -200,7 +200,7 @@ describe("a2a_send_completing tool", () => {
     setup({ status: "waiting-human" });
     const tool = createA2ACompletingTool({ agentSessionKey: "agent:main:a2a:task-1" });
     const result = await tool.execute("call-1", { result: "Done" });
-    const parsed = JSON.parse(result.content[0].text) as { status: string };
+    const parsed = JSON.parse((result.content[0] as { text: string }).text) as { status: string };
     expect(parsed.status).toBe("completing");
   });
 
@@ -208,7 +208,10 @@ describe("a2a_send_completing tool", () => {
     setup({ sendOk: false });
     const tool = createA2ACompletingTool({ agentSessionKey: "agent:main:a2a:task-1" });
     const result = await tool.execute("call-1", { result: "Done" });
-    const parsed = JSON.parse(result.content[0].text) as { messageSent: boolean; status: string };
+    const parsed = JSON.parse((result.content[0] as { text: string }).text) as {
+      messageSent: boolean;
+      status: string;
+    };
     // Task still transitions even if send fails
     expect(parsed.status).toBe("completing");
     expect(parsed.messageSent).toBe(false);
@@ -218,7 +221,9 @@ describe("a2a_send_completing tool", () => {
     setup();
     const tool = createA2ACompletingTool({ agentSessionKey: "agent:main:a2a:task-1" });
     const result = await tool.execute("call-1", { result: "Done" });
-    const parsed = JSON.parse(result.content[0].text) as { messageId: string };
+    const parsed = JSON.parse((result.content[0] as { text: string }).text) as {
+      messageId: string;
+    };
     expect(parsed.messageId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
