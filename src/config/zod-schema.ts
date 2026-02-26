@@ -467,6 +467,7 @@ export const OpenClawSchema = z
       .object({
         enabled: z.boolean().optional(),
         publicUrl: HttpUrlSchema.optional(),
+        taskTtlMs: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),
