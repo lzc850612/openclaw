@@ -12,8 +12,10 @@ describe("canTransition", () => {
   test("active → failed is allowed", () => {
     expect(canTransition("active", "failed")).toBe(true);
   });
-  test("active → closed is NOT allowed", () => {
-    expect(canTransition("active", "closed")).toBe(false);
+  // active → closed: receiver of "completing" goes directly to closed
+  // (dispatches agent turn, sends "completed", then closes without going through completing)
+  test("active → closed is allowed (receiver of completing skips completing state)", () => {
+    expect(canTransition("active", "closed")).toBe(true);
   });
 
   // completing transitions

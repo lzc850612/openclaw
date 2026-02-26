@@ -5,8 +5,9 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { runCronIsolatedAgentTurn } from "../cron/isolated-agent.js";
 import type { CronJob } from "../cron/types.js";
 import { readJsonBodyWithLimit } from "../infra/http-body.js";
+import { enqueueAndSend } from "./message-queue.js";
 import { buildA2ASessionKey } from "./session-keys.js";
-import { appendMessage, createTask, loadTask } from "./task-store.js";
+import { appendMessage, createTask, loadTask, transitionTask } from "./task-store.js";
 
 export const A2A_MESSAGE_PATH = "/a2a/message";
 const MAX_BODY_BYTES = 1_000_000; // 1 MB
@@ -133,17 +134,20 @@ export async function handleA2aMessageRequest(
   return true;
 }
 
+type HandlerLog = {
+  debug: (message: string, meta?: Record<string, unknown>) => void;
+  warn?: (message: string, meta?: Record<string, unknown>) => void;
+};
+
 async function dispatchInboundTurn(
   msg: InboundA2AMessage,
   cfg: OpenClawConfig,
-  log: { debug: (message: string, meta?: Record<string, unknown>) => void },
+  log: HandlerLog,
   deps: CliDeps,
 ): Promise<void> {
-  // Determine which local agent owns this task.
-  // The task file encodes the agentId; we look it up via the task store.
-  // For now, resolve the default agent (same as hooks.ts pattern).
   const { resolveDefaultAgentId } = await import("../agents/agent-scope.js");
   const agentId = resolveDefaultAgentId(cfg);
+  const localInstanceUrl = cfg.federation?.publicUrl ?? "";
 
   // Auto-create task as responder when first inbound message arrives.
   if (!loadTask(agentId, msg.taskId)) {
@@ -154,8 +158,6 @@ async function dispatchInboundTurn(
         role: "responder",
         remoteInstanceUrl: msg.fromInstanceUrl,
         remoteAgentId: msg.fromAgentId,
-        // Use the first message content as a stand-in goal until the protocol
-        // evolves to carry an explicit goal field.
         goal: msg.content,
         status: "active",
       });
@@ -186,6 +188,100 @@ async function dispatchInboundTurn(
     });
   }
 
+  // Route by protocol message type.
+  if (msg.type === "completed") {
+    // Remote side confirmed close — transition local task to closed.
+    // TODO(Phase 7): fire completion callbacks here.
+    try {
+      transitionTask(agentId, msg.taskId, "closed");
+      log.debug("a2a: task closed on inbound completed", { taskId: msg.taskId });
+    } catch (err) {
+      log.debug("a2a: could not close task on completed", {
+        taskId: msg.taskId,
+        error: String(err),
+      });
+    }
+    return;
+  }
+
+  if (msg.type === "completing") {
+    // Remote side is done — check if we are already closed (simultaneous close edge case).
+    const task = loadTask(agentId, msg.taskId);
+    if (task?.status === "closed") {
+      // Already closed: re-send completed (idempotent), no state change.
+      log.debug("a2a: received completing on closed task, re-sending completed", {
+        taskId: msg.taskId,
+      });
+      void sendCompletedReply(agentId, msg, localInstanceUrl, cfg, log);
+      return;
+    }
+
+    // Dispatch agent turn so the agent can do its final processing.
+    await runAgentTurn(agentId, msg, cfg, log, deps);
+
+    // After the turn: send completed and close the task.
+    void sendCompletedReply(agentId, msg, localInstanceUrl, cfg, log);
+    try {
+      transitionTask(agentId, msg.taskId, "closed");
+      log.debug("a2a: task closed after processing completing", { taskId: msg.taskId });
+    } catch (err) {
+      log.debug("a2a: could not close task after completing", {
+        taskId: msg.taskId,
+        error: String(err),
+      });
+    }
+    return;
+  }
+
+  // Regular message — dispatch agent turn.
+  await runAgentTurn(agentId, msg, cfg, log, deps);
+}
+
+/** Send { type: "completed" } back to the peer that sent "completing". */
+async function sendCompletedReply(
+  agentId: string,
+  msg: InboundA2AMessage,
+  localInstanceUrl: string,
+  _cfg: OpenClawConfig,
+  log: HandlerLog,
+): Promise<void> {
+  if (!localInstanceUrl) {
+    log.debug("a2a: cannot send completed reply — federation.publicUrl not set", {
+      taskId: msg.taskId,
+    });
+    return;
+  }
+  const messageId = randomUUID();
+  // enqueueAndSend requires both debug and warn; provide a no-op warn if missing.
+  const sendLog = { debug: log.debug, warn: log.warn ?? log.debug };
+  const result = await enqueueAndSend({
+    agentId,
+    peerInstanceUrl: msg.fromInstanceUrl,
+    message: {
+      taskId: msg.taskId,
+      messageId,
+      fromInstanceUrl: localInstanceUrl,
+      fromAgentId: agentId,
+      type: "completed",
+      content: "",
+    },
+    log: sendLog,
+  });
+  if (!result.ok) {
+    log.debug("a2a: completed reply send failed", { taskId: msg.taskId, error: result.error });
+  } else {
+    log.debug("a2a: completed reply sent", { taskId: msg.taskId, messageId });
+  }
+}
+
+/** Dispatch an isolated agent reasoning turn for the inbound message. */
+async function runAgentTurn(
+  agentId: string,
+  msg: InboundA2AMessage,
+  cfg: OpenClawConfig,
+  log: HandlerLog,
+  deps: CliDeps,
+): Promise<void> {
   const sessionKey = buildA2ASessionKey(agentId, msg.taskId);
   const jobId = randomUUID();
   const now = Date.now();

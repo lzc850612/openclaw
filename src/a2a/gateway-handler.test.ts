@@ -153,4 +153,34 @@ describe("handleA2aMessageRequest", () => {
     expect(meta.type).toBe(VALID_BODY.type);
     expect(String(meta.fromAgent)).toContain(VALID_BODY.fromAgentId);
   });
+
+  // --- Protocol message types (HTTP layer) ---
+
+  test("returns 202 for a completing-type message", async () => {
+    const body = { ...VALID_BODY, type: "completing" };
+    const req = makeReq({ path: A2A_MESSAGE_PATH, body });
+    const { res, statusCode } = makeRes();
+    const result = await handleA2aMessageRequest(req, res, FEDERATION_ENABLED, noopLog);
+    expect(result).toBe(true);
+    expect(statusCode.value).toBe(202);
+  });
+
+  test("returns 202 for a completed-type message", async () => {
+    const body = { ...VALID_BODY, type: "completed" };
+    const req = makeReq({ path: A2A_MESSAGE_PATH, body });
+    const { res, statusCode } = makeRes();
+    const result = await handleA2aMessageRequest(req, res, FEDERATION_ENABLED, noopLog);
+    expect(result).toBe(true);
+    expect(statusCode.value).toBe(202);
+  });
+
+  test("echoes the messageId in the 202 response body for completing messages", async () => {
+    const body = { ...VALID_BODY, messageId: "completing-msg-1", type: "completing" };
+    const req = makeReq({ path: A2A_MESSAGE_PATH, body });
+    const { res, body: resBody } = makeRes();
+    await handleA2aMessageRequest(req, res, FEDERATION_ENABLED, noopLog);
+    const parsed = JSON.parse(resBody.value) as { ok: boolean; messageId: string };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.messageId).toBe("completing-msg-1");
+  });
 });

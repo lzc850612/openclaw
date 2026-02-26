@@ -74,7 +74,7 @@ deliver. This is intentionally open for dev/test; auth is added in Phase 10.
 
 Goal: tasks are durable, survive restarts, and messages are delivered reliably with retry.
 
-- ☐ **3.1** Define `A2ATask` and `A2AMessage` types
+- ✅ **3.1** Define `A2ATask` and `A2AMessage` types
   - File: `src/a2a/task-store.ts`
   - Task fields: `id`, `status`, `initiatorInstanceUrl`, `initiatorAgentId`,
     `participantInstanceUrl`, `participantAgentId`, `goal`, `transcript`, `gates`,
@@ -82,43 +82,43 @@ Goal: tasks are durable, survive restarts, and messages are delivered reliably w
   - Message fields: `id`, `taskId`, `type`, `fromInstanceUrl`, `fromAgentId`, `content`,
     `sentAt`, `ackedAt`, `retryCount`
 
-- ☐ **3.2** Implement task store (persist/load/update)
+- ✅ **3.2** Implement task store (persist/load/update)
   - Storage: `~/.openclaw/agents/<agentId>/a2a/<taskId>.json`
   - Operations: `create`, `load`, `patchStatus`, `appendMessage`, `listInProgress`, `listAll`
   - `listAll` is needed by the monitor dashboard (Phase 4)
 
-- ☐ **3.3** Implement task state machine
+- ✅ **3.3** Implement task state machine
   - File: `src/a2a/task-state.ts`
   - Valid transitions: `active → completing → closed`, `active → waiting-human → active`,
     `active → failed`, `completing → failed`
   - Reject and log invalid transitions
 
-- ☐ **3.4** Upgrade outbox to persistent queue with retry
+- ✅ **3.4** Upgrade outbox to persistent queue with retry
   - File: `src/a2a/message-queue.ts` (replace Phase 2 stub)
   - Persistent outbox: write message to disk before first send attempt
   - Retry with exponential backoff using `src/infra/retry.ts`
   - Idempotency: receiver returns 202 on duplicate `messageId`; sender marks delivered on any 2xx
 
-- ☐ **3.5** Implement startup restart-catchup
+- ✅ **3.5** Implement startup restart-catchup
   - On gateway startup: load all `active` and `completing` tasks
   - Re-enqueue any outbox messages not yet ACKed
 
-- ☐ **3.6** Wire inbound message to agent dispatch
+- ✅ **3.6** Wire inbound message to agent dispatch
   - On valid inbound: store in task transcript, call `dispatchAgentHook` with
     `sessionKey: "a2a:<taskId>"`, `agentId`, `channel: "openclaw-peer"`, `message: <content>`
 
-- ☐ **3.7** Implement `a2a:` session key helpers
+- ✅ **3.7** Implement `a2a:` session key helpers
   - File: `src/a2a/session-keys.ts`
   - `isA2ASessionKey(key)`, `parseA2ATaskId(key)`, `buildA2ASessionKey(taskId)`
   - Extend `src/sessions/session-key-utils.ts` to recognise the `a2a:` prefix
 
-- ☐ **3.8** Implement `a2a_start_task` agent tool
+- ✅ **3.8** Implement `a2a_start_task` agent tool
   - Available to agents in all channels (not A2A-specific)
   - Parameters: `remoteInstanceUrl`, `remoteAgentId`, `goal`, `message`
   - Resolves peer via discovery (Phase 1.4), creates task on disk, enqueues first message,
     returns `{ taskId }` immediately
 
-- ☐ **3.9** Write tests for Phase 3
+- ✅ **3.9** Write tests for Phase 3
   - Unit: task store CRUD, state machine transitions, outbox enqueue/dequeue/retry
   - Integration: message sent → stored → delivered → ACKed; restart resumes pending delivery
   - E2E: two gateway instances exchange a single message; both reflect correct task state
@@ -167,18 +167,18 @@ Served entirely from the gateway as two new routes in the A2A plugin HTTP handle
 build step, no framework. The dashboard is a single self-contained HTML file with inline CSS and
 vanilla JS. Data comes from a JSON API that reads the task store on disk.
 
-- ☐ **4.1** Add `GET /a2a/tasks` JSON API endpoint
+- ✅ **4.1** Add `GET /a2a/tasks` JSON API endpoint
   - File: `src/a2a/monitor-api.ts`
   - Returns: array of all tasks (all statuses) with summary fields: `id`, `status`,
     `peerInstanceUrl`, `peerAgentId`, `goal`, `messageCount`, `lastActivityAt`
   - Register as a plugin HTTP route alongside `POST /a2a/message`
 
-- ☐ **4.2** Add `GET /a2a/tasks/:taskId` JSON API endpoint
+- ✅ **4.2** Add `GET /a2a/tasks/:taskId` JSON API endpoint
   - Returns: full task record including `transcript` (all messages with `type`, `fromInstanceUrl`,
     `fromAgentId`, `content`, `sentAt`, `ackedAt`) and `gates`
   - Direction derived from `fromInstanceUrl`: matches local instance URL → outbound, else → inbound
 
-- ☐ **4.3** Implement dashboard HTML page at `GET /a2a/monitor`
+- ✅ **4.3** Implement dashboard HTML page at `GET /a2a/monitor`
   - File: `src/a2a/monitor-ui.ts` (returns a static HTML string; no build tooling)
   - Two-panel layout: task list on left, message thread on right
   - Task list: click to select; active tasks highlighted; status badge colored by state
@@ -192,13 +192,13 @@ vanilla JS. Data comes from a JSON API that reads the task store on disk.
   - Auto-refresh: polls `GET /a2a/tasks` and the selected task every 2 seconds
   - No WebSocket or bundler required — plain `setInterval` + `fetch`
 
-- ☐ **4.4** Wire monitor routes into gateway HTTP server
+- ✅ **4.4** Wire monitor routes into gateway HTTP server
   - `src/gateway/server-a2a.ts`: register `GET /a2a/tasks`, `GET /a2a/tasks/:taskId`,
     `GET /a2a/monitor`
   - All three routes return 404 when `federation.enabled = false`
   - No auth on monitor in dev mode; Phase 10 adds gateway-token gating
 
-- ☐ **4.5** Write tests for Phase 4
+- ✅ **4.5** Write tests for Phase 4
   - Unit: `GET /a2a/tasks` returns correct summary shape; `GET /a2a/tasks/:id` returns full
     transcript; direction derived correctly from `fromInstanceUrl`
   - Integration: dashboard HTML page is served and contains expected structure; auto-refresh
@@ -210,32 +210,32 @@ vanilla JS. Data comes from a JSON API that reads the task store on disk.
 
 Goal: task closure is explicit and bilateral; both sides confirm before callbacks fire.
 
-- ☐ **5.1** Add `completing` and `completed` message types to protocol
+- ✅ **5.1** Add `completing` and `completed` message types to protocol
   - Extend `A2AMessageType`: `"message" | "completing" | "completed" | "error"`
   - Update message store to record `type` alongside `content`
 
-- ☐ **5.2** Implement `send_completing(result)` agent tool
+- ✅ **5.2** Implement `send_completing(result)` agent tool
   - Sends `{ type: "completing", content: result }` to peer via outbox
   - Sets local task status to `completing`
 
-- ☐ **5.3** Handle inbound `completing` on receiver side
+- ✅ **5.3** Handle inbound `completing` on receiver side
   - Dispatch to agent reasoning loop so agent does its final processing
   - After loop ends: automatically send `{ type: "completed" }` and set local task status to
     `closed`
 
-- ☐ **5.4** Handle inbound `completed`
+- ✅ **5.4** Handle inbound `completed`
   - Set local task status to `closed`
   - Trigger completion callbacks (Phase 7)
 
-- ☐ **5.5** Handle simultaneous close
+- ✅ **5.5** Handle simultaneous close
   - Both sides send `completing` at the same time
   - Whichever receives the peer's `completing` first: send `completed`, set `closed`
   - `completing` arriving on an already-`closed` task: respond `completed`, no further state change
 
-- ☐ **5.6** Implement TTL enforcement
+- ✅ **5.6** Implement TTL enforcement
   - Background check: tasks stuck in `completing` past `expiresAt` are force-closed as `failed`
 
-- ☐ **5.7** Write tests for Phase 5
+- ✅ **5.7** Write tests for Phase 5
   - Unit: state machine handles all completing/completed transitions
   - Integration: normal close; simultaneous close; TTL expiry
   - Visual check: monitor dashboard shows completing/completed messages in yellow; closed task

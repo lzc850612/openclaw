@@ -96,7 +96,9 @@ describe("transitionTask", () => {
 
   test("throws on illegal transitions", () => {
     createTask(baseTask(), tmpDir);
-    expect(() => transitionTask(AGENT_ID, TASK_ID, "closed", tmpDir)).toThrow(/invalid transition/);
+    transitionTask(AGENT_ID, TASK_ID, "completing", tmpDir);
+    // completing → active is not allowed (cannot go back to active once completing)
+    expect(() => transitionTask(AGENT_ID, TASK_ID, "active", tmpDir)).toThrow(/invalid transition/);
   });
 
   test("full happy path: active → completing → closed", () => {

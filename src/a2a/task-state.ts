@@ -2,7 +2,9 @@ export type A2ATaskStatus = "active" | "completing" | "closed" | "waiting-human"
 
 // Allowed transitions per source state.
 const VALID_TRANSITIONS: Readonly<Record<A2ATaskStatus, readonly A2ATaskStatus[]>> = {
-  active: ["completing", "waiting-human", "failed"],
+  // active → closed: receiver of a "completing" message goes directly to closed
+  // after its agent turn + auto-sending "completed", without going through completing.
+  active: ["completing", "closed", "waiting-human", "failed"],
   completing: ["closed", "failed"],
   "waiting-human": ["active", "failed"],
   closed: [],

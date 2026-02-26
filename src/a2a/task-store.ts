@@ -6,10 +6,14 @@ import { canTransition, isTerminalStatus } from "./task-state.js";
 
 export type { A2ATaskStatus };
 
+/** Well-known A2A protocol message types. */
+export type A2AMessageType = "message" | "completing" | "completed" | "error";
+
 export type A2AMessage = {
   messageId: string;
   fromInstanceUrl: string;
   fromAgentId: string;
+  /** Protocol type. Stored as string to preserve any non-standard values on disk. */
   type: string;
   content: string;
   receivedAtMs: number;
@@ -26,6 +30,8 @@ export type A2ATask = {
   status: A2ATaskStatus;
   createdAtMs: number;
   updatedAtMs: number;
+  /** Unix-ms after which a stuck completing task is force-failed. Optional. */
+  expiresAt?: number;
   messages: A2AMessage[];
 };
 
@@ -190,4 +196,15 @@ export function listTasksByStatus(
     }
   }
   return result;
+}
+
+/**
+ * List tasks in `completing` state whose `expiresAt` has passed.
+ * Used by the TTL enforcer to find tasks that need to be force-failed.
+ */
+export function listExpiredCompletingTasks(agentId: string, stateDir?: string): A2ATask[] {
+  const now = Date.now();
+  return listTasksByStatus(agentId, ["completing"], stateDir).filter(
+    (t) => t.expiresAt !== undefined && t.expiresAt <= now,
+  );
 }

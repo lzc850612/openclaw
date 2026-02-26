@@ -320,6 +320,11 @@ export type FederationConfig = {
   enabled?: boolean;
   /** The publicly reachable base URL of this gateway (e.g. "http://localhost:18789"). */
   publicUrl?: string;
+  /**
+   * Task TTL in milliseconds. Tasks stuck in "completing" past this age are
+   * force-failed by the TTL enforcer. Default: 86400000 (24 hours).
+   */
+  taskTtlMs?: number;
 };
 
 export type GatewayConfig = {
