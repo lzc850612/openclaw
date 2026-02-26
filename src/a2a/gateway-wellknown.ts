@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { DEFAULT_AGENT_ID } from "../routing/session-key.js";
 
 export const WELLKNOWN_PATH = "/.well-known/openclaw.json";
 export const A2A_PROTOCOL_VERSION = "1.0";
@@ -30,10 +31,16 @@ export function buildWellKnownResponse(cfg: OpenClawConfig): WellKnownResponse |
     return null;
   }
   const agentList = cfg.agents?.list ?? [];
+  // When no agents are explicitly configured, advertise the default agent so
+  // peers can always discover this instance without requiring agents.list setup.
+  const agents =
+    agentList.length > 0
+      ? agentList.map((a) => ({ id: a.id, capabilities: [A2A_CAPABILITY] }))
+      : [{ id: DEFAULT_AGENT_ID, capabilities: [A2A_CAPABILITY] }];
   return {
     version: A2A_PROTOCOL_VERSION,
     instanceUrl,
-    agents: agentList.map((a) => ({ id: a.id, capabilities: [A2A_CAPABILITY] })),
+    agents,
   };
 }
 

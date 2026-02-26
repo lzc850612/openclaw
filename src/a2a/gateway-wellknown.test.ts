@@ -55,12 +55,13 @@ describe("buildWellKnownResponse", () => {
     expect(result?.agents[1]).toEqual({ id: "agent-b", capabilities: [A2A_CAPABILITY] });
   });
 
-  test("returns empty agents array when no agents are configured", () => {
+  test("returns default agent when no agents are configured", () => {
     const cfg: OpenClawConfig = {
       federation: { enabled: true, publicUrl: "http://localhost:18789" },
     };
     const result = buildWellKnownResponse(cfg);
-    expect(result?.agents).toEqual([]);
+    expect(result?.agents).toHaveLength(1);
+    expect(result?.agents[0]?.capabilities).toContain(A2A_CAPABILITY);
   });
 });
 
