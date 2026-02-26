@@ -124,7 +124,7 @@ export function buildMonitorHtml(): string {
       return;
     }
     el.innerHTML=tasks.map(function(t){
-      return '<div class="task-item'+(t.taskId===selId?' sel':'')+'" onclick="window._sel('+JSON.stringify(t.taskId)+')">'+
+      return '<div class="task-item'+(t.taskId===selId?' sel':'')+'" onclick="window._sel('+esc(JSON.stringify(t.taskId))+')">'+
         '<div class="t-id">'+esc(t.taskId.slice(0,8))+'…</div>'+
         '<div class="t-goal" title="'+esc(t.goal)+'">'+esc(t.goal)+'</div>'+
         '<div class="t-meta">'+
