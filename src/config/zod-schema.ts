@@ -468,6 +468,7 @@ export const OpenClawSchema = z
         enabled: z.boolean().optional(),
         publicUrl: HttpUrlSchema.optional(),
         taskTtlMs: z.number().int().positive().optional(),
+        maxGatesPerTask: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),

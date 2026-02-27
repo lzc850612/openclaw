@@ -325,6 +325,12 @@ export type FederationConfig = {
    * force-failed by the TTL enforcer. Default: 86400000 (24 hours).
    */
   taskTtlMs?: number;
+  /**
+   * Maximum number of pending human-in-the-loop gates allowed per task.
+   * The a2a_create_human_gate tool throws when this limit is reached.
+   * Default: 5.
+   */
+  maxGatesPerTask?: number;
 };
 
 export type GatewayConfig = {

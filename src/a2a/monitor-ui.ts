@@ -64,6 +64,14 @@ export function buildMonitorHtml(): string {
     .msg-body{font-size:.8rem;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;line-height:1.5}
     .msg-from{font-size:.62rem;color:#4a5568;margin-top:4px}
     .no-msgs{color:#4a5568;font-size:.78rem;text-align:center;padding:32px 0}
+    /* ── HumanGate banners ── */
+    .gate-pending{width:100%;padding:9px 14px;border-radius:6px;background:#3d3000;border:1px solid #7c5e00;color:#fbd38d;font-size:.8rem;display:flex;align-items:flex-start;gap:8px;box-sizing:border-box}
+    .gate-pending .gate-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+    .gate-pending .gate-text{flex:1;line-height:1.5}
+    .gate-pending .gate-since{font-size:.65rem;color:#b7791f;margin-top:3px}
+    .gate-answered{width:100%;padding:7px 14px;border-radius:6px;background:#1a2020;border:1px solid #2d4040;color:#718096;font-size:.78rem;display:flex;align-items:flex-start;gap:8px;box-sizing:border-box}
+    .gate-answered .gate-icon{flex-shrink:0}
+    .gate-answered .gate-text{flex:1;line-height:1.5}
   </style>
 </head>
 <body>
@@ -137,6 +145,24 @@ export function buildMonitorHtml(): string {
     }).join('');
   }
 
+  function renderGate(g){
+    if(g.status==='pending'){
+      return '<div class="gate-pending">'+
+        '<span class="gate-icon">&#9646;</span>'+
+        '<div class="gate-text">'+
+          '<strong>waiting for human:</strong> &ldquo;'+esc(g.question)+'&rdquo;'+
+          '<div class="gate-since">pending since '+ts(g.createdAt)+'</div>'+
+        '</div>'+
+      '</div>';
+    }
+    return '<div class="gate-answered">'+
+      '<span class="gate-icon">&#10003;</span>'+
+      '<div class="gate-text">'+
+        'gate answered: &ldquo;'+esc(g.answer||'')+'&rdquo;'+
+      '</div>'+
+    '</div>';
+  }
+
   function renderThread(){
     var panel=document.getElementById('thread');
     if(!selTask){
@@ -158,6 +184,9 @@ export function buildMonitorHtml(): string {
         '<div class="msg-from">'+esc(m.fromAgentId)+'@'+esc(host(m.fromInstanceUrl))+'</div>'+
       '</div>';
     }).join('');
+    // Render gate banners after messages.
+    var gateHtml=(t.gates||[]).map(renderGate).join('');
+    var threadContent=msgs+(gateHtml?gateHtml:'');
     panel.innerHTML=
       '<div class="th-hdr">'+
         '<div class="th-title" title="'+esc(t.goal)+'">'+esc(t.goal)+'</div>'+
@@ -168,7 +197,7 @@ export function buildMonitorHtml(): string {
           '<span>created '+ts(t.createdAtMs)+'</span>'+
         '</div>'+
       '</div>'+
-      '<div class="msgs">'+(msgs||'<div class="no-msgs">No messages recorded yet</div>')+'</div>';
+      '<div class="msgs">'+(threadContent||'<div class="no-msgs">No messages recorded yet</div>')+'</div>';
     // scroll to bottom
     var msgs_el=panel.querySelector('.msgs');
     if(msgs_el) msgs_el.scrollTop=msgs_el.scrollHeight;
