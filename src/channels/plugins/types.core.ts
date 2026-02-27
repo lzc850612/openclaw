@@ -286,6 +286,7 @@ export type ChannelMessagingAdapter = {
 
 export type ChannelAgentPromptAdapter = {
   messageToolHints?: (params: { cfg: OpenClawConfig; accountId?: string | null }) => string[];
+  sessionContext?: (params: { cfg: unknown; sessionKey: string; agentId: string }) => string | null;
 };
 
 export type ChannelDirectoryEntryKind = "user" | "group" | "channel";
