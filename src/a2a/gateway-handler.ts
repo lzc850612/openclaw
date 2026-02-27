@@ -3,7 +3,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { CliDeps } from "../cli/deps.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { readJsonBodyWithLimit } from "../infra/http-body.js";
+import { buildA2AMessageHeader } from "./agent-prompt.js";
 import { runA2AAgentTurn } from "./agent-turn.js";
+import { dispatchCompletionCallback, dispatchParticipantNotification } from "./callbacks.js";
 import { enqueueAndSend } from "./message-queue.js";
 import { buildA2ASessionKey } from "./session-keys.js";
 import { appendMessage, createTask, loadTask, transitionTask } from "./task-store.js";
@@ -190,7 +192,6 @@ async function dispatchInboundTurn(
   // Route by protocol message type.
   if (msg.type === "completed") {
     // Remote side confirmed close — transition local task to closed.
-    // TODO(Phase 7): fire completion callbacks here.
     try {
       transitionTask(agentId, msg.taskId, "closed");
       log.debug("a2a: task closed on inbound completed", { taskId: msg.taskId });
@@ -199,6 +200,11 @@ async function dispatchInboundTurn(
         taskId: msg.taskId,
         error: String(err),
       });
+    }
+    // Fire completion callback so the agent can summarise the outcome for the human.
+    const closedTaskOnCompleted = loadTask(agentId, msg.taskId);
+    if (closedTaskOnCompleted) {
+      void dispatchCompletionCallback({ cfg, agentId, task: closedTaskOnCompleted });
     }
     return;
   }
@@ -228,6 +234,11 @@ async function dispatchInboundTurn(
         taskId: msg.taskId,
         error: String(err),
       });
+    }
+    // Notify participant that their task has closed.
+    const closedTaskOnCompleting = loadTask(agentId, msg.taskId);
+    if (closedTaskOnCompleting) {
+      void dispatchParticipantNotification({ cfg, agentId, task: closedTaskOnCompleting });
     }
     return;
   }
@@ -287,7 +298,25 @@ async function runAgentTurn(
     return;
   }
 
-  const result = await runA2AAgentTurn({ cfg, agentId, task, message: msg.content, sessionKey });
+  // Determine round number from the number of messages already in the transcript.
+  const roundNumber = task.messages.length;
+
+  // Prepend a trusted sender context header so the agent knows who sent the message.
+  const header = buildA2AMessageHeader({
+    fromAgentId: msg.fromAgentId,
+    fromInstanceUrl: msg.fromInstanceUrl,
+    taskId: msg.taskId,
+    roundNumber,
+  });
+  const messageWithHeader = `${header}\n\n${msg.content}`;
+
+  const result = await runA2AAgentTurn({
+    cfg,
+    agentId,
+    task,
+    message: messageWithHeader,
+    sessionKey,
+  });
   if (result.status === "error") {
     log.debug("a2a: agent turn failed", {
       taskId: msg.taskId,

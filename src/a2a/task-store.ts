@@ -19,6 +19,28 @@ export type A2AMessage = {
   receivedAtMs: number;
 };
 
+/** A human-in-the-loop gate that pauses task execution pending a human answer. */
+export type HumanGate = {
+  /** UUID identifying this gate. */
+  id: string;
+  taskId: string;
+  agentId: string;
+  /** The question posed to the human operator. */
+  question: string;
+  /** Channel that was notified (optional, for audit). */
+  notifiedChannel?: string;
+  /** Target within the notified channel (optional, for audit). */
+  notifiedTarget?: string;
+  status: "pending" | "answered";
+  answer?: string;
+  /** Unix-ms timestamp when the gate was created. */
+  createdAt: number;
+  /** Unix-ms timestamp when the gate was answered (if answered). */
+  answeredAt?: number;
+  /** Optional timeout in ms after which the gate may be auto-expired. */
+  timeoutMs?: number;
+};
+
 export type A2ATask = {
   taskId: string;
   agentId: string;
@@ -33,6 +55,13 @@ export type A2ATask = {
   /** Unix-ms after which a stuck completing task is force-failed. Optional. */
   expiresAt?: number;
   messages: A2AMessage[];
+  /** Human-in-the-loop gates recorded on this task. */
+  gates?: HumanGate[];
+  /**
+   * Session key of the human channel that initiated this task (initiator side only).
+   * When set, a completion callback will be dispatched to this session when the task closes.
+   */
+  callbackSessionKey?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -207,4 +236,69 @@ export function listExpiredCompletingTasks(agentId: string, stateDir?: string): 
   return listTasksByStatus(agentId, ["completing"], stateDir).filter(
     (t) => t.expiresAt !== undefined && t.expiresAt <= now,
   );
+}
+
+// ---------------------------------------------------------------------------
+// HumanGate helpers
+// ---------------------------------------------------------------------------
+
+/** Append a new gate to the task's gates array and persist atomically. */
+export function createGate(
+  agentId: string,
+  taskId: string,
+  gate: HumanGate,
+  stateDir?: string,
+): A2ATask {
+  const dir = stateDir ?? resolveStateDir();
+  const task = loadTask(agentId, taskId, dir);
+  if (!task) {
+    throw new Error(`A2A task not found: ${taskId}`);
+  }
+  const updated: A2ATask = {
+    ...task,
+    gates: [...(task.gates ?? []), gate],
+    updatedAtMs: Date.now(),
+  };
+  writeJsonAtomic(resolveTaskPath(dir, agentId, taskId), updated);
+  return updated;
+}
+
+/** Returns all gates for a task, or an empty array if none exist. */
+export function loadGates(agentId: string, taskId: string, stateDir?: string): HumanGate[] {
+  const dir = stateDir ?? resolveStateDir();
+  const task = loadTask(agentId, taskId, dir);
+  return task?.gates ?? [];
+}
+
+/**
+ * Mark a gate as answered and persist. Throws if the task or gate is not found.
+ */
+export function answerGate(
+  agentId: string,
+  taskId: string,
+  gateId: string,
+  answer: string,
+  stateDir?: string,
+): A2ATask {
+  const dir = stateDir ?? resolveStateDir();
+  const task = loadTask(agentId, taskId, dir);
+  if (!task) {
+    throw new Error(`A2A task not found: ${taskId}`);
+  }
+  const gates = task.gates ?? [];
+  const idx = gates.findIndex((g) => g.id === gateId);
+  if (idx === -1) {
+    throw new Error(`HumanGate not found: ${gateId} on task ${taskId}`);
+  }
+  const updatedGates: HumanGate[] = gates.map((g, i) =>
+    i === idx ? { ...g, status: "answered" as const, answer, answeredAt: Date.now() } : g,
+  );
+  const updated: A2ATask = { ...task, gates: updatedGates, updatedAtMs: Date.now() };
+  writeJsonAtomic(resolveTaskPath(dir, agentId, taskId), updated);
+  return updated;
+}
+
+/** Returns the count of gates with status "pending" for the given task. */
+export function countOpenGates(agentId: string, taskId: string, stateDir?: string): number {
+  return loadGates(agentId, taskId, stateDir).filter((g) => g.status === "pending").length;
 }
