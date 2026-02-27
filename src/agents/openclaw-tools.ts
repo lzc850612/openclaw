@@ -5,6 +5,7 @@ import { resolveSessionAgentId } from "./agent-scope.js";
 import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import type { ToolFsPolicy } from "./tool-fs-policy.js";
 import { createA2ACompletingTool } from "./tools/a2a-completing-tool.js";
+import { createA2ACreateHumanGateTool } from "./tools/create-human-gate-tool.js";
 import { createA2ATool } from "./tools/a2a-tool.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
@@ -115,6 +116,9 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createA2ACompletingTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createA2ACreateHumanGateTool({
       agentSessionKey: options?.agentSessionKey,
     }),
     createBrowserTool({
